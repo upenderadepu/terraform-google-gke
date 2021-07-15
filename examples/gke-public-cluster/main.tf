@@ -5,10 +5,21 @@
 # ---------------------------------------------------------------------------------------------------------------------
 
 terraform {
-  # This module is now only being tested with Terraform 0.13.x. However, to make upgrading easier, we are setting
+  # This module is now only being tested with Terraform 0.14.x. However, to make upgrading easier, we are setting
   # 0.12.26 as the minimum version, as that version added support for required_providers with source URLs, making it
-  # forwards compatible with 0.13.x code.
+  # forwards compatible with 0.14.x code.
   required_version = ">= 0.12.26"
+
+  required_providers {
+    google = {
+      source  = "hashicorp/google"
+      version = "~> 3.43.0"
+    }
+    google-beta = {
+      source  = "hashicorp/google-beta"
+      version = "~> 3.43.0"
+    }
+  }
 }
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -16,13 +27,11 @@ terraform {
 # ---------------------------------------------------------------------------------------------------------------------
 
 provider "google" {
-  version = "~> 3.43.0"
   project = var.project
   region  = var.region
 }
 
 provider "google-beta" {
-  version = "~> 3.43.0"
   project = var.project
   region  = var.region
 }
@@ -41,14 +50,14 @@ module "gke_cluster" {
 
   project  = var.project
   location = var.location
+  network  = module.vpc_network.network
 
   # We're deploying the cluster in the 'public' subnetwork to allow outbound internet access
   # See the network access tier table for full details:
   # https://github.com/gruntwork-io/terraform-google-network/tree/master/modules/vpc-network#access-tier
-  network = module.vpc_network.network
-
-  subnetwork                   = module.vpc_network.public_subnetwork
-  cluster_secondary_range_name = module.vpc_network.public_subnetwork_secondary_range_name
+  subnetwork                    = module.vpc_network.public_subnetwork
+  cluster_secondary_range_name  = module.vpc_network.public_subnetwork_secondary_range_name
+  services_secondary_range_name = module.vpc_network.public_services_secondary_range_name
 
   alternative_default_service_account = var.override_default_node_pool_service_account ? module.gke_service_account.email : null
 
@@ -151,7 +160,7 @@ resource "random_string" "suffix" {
 }
 
 module "vpc_network" {
-  source = "github.com/gruntwork-io/terraform-google-network.git//modules/vpc-network?ref=v0.6.0"
+  source = "github.com/gruntwork-io/terraform-google-network.git//modules/vpc-network?ref=v0.7.1"
 
   name_prefix = "${var.cluster_name}-network-${random_string.suffix.result}"
   project     = var.project
@@ -159,4 +168,11 @@ module "vpc_network" {
 
   cidr_block           = var.vpc_cidr_block
   secondary_cidr_block = var.vpc_secondary_cidr_block
+
+  public_subnetwork_secondary_range_name = var.public_subnetwork_secondary_range_name
+  public_services_secondary_range_name   = var.public_services_secondary_range_name
+  public_services_secondary_cidr_block   = var.public_services_secondary_cidr_block
+  private_services_secondary_cidr_block  = var.private_services_secondary_cidr_block
+  secondary_cidr_subnetwork_width_delta  = var.secondary_cidr_subnetwork_width_delta
+  secondary_cidr_subnetwork_spacing      = var.secondary_cidr_subnetwork_spacing
 }
